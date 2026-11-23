@@ -1,5 +1,5 @@
 /* Static shell only. Never cache API endpoints or other origins in the service worker. */
-const CACHE_NAME = 'golf-yardage-shell-v1.3-r2';
+const CACHE_NAME = 'golf-yardage-shell-v1.3-r3';
 const SHELL = [
   './', './index.html', './styles.css', './app.mjs',
   './lib/yardage.mjs', './lib/weather.mjs', './lib/compass.mjs', './manifest.webmanifest',

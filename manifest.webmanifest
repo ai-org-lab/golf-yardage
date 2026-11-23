@@ -1,6 +1,6 @@
 {
-  "name": "打つ距離 - Golf Yardage",
-  "short_name": "打つ距離",
+  "name": "距離計算 - Golf Yardage",
+  "short_name": "距離計算",
   "description": "高低差・気温・風を考慮した打つ距離の目安。オフラインで計算できます。",
   "id": "./index.html",
   "start_url": "./index.html",
