@@ -1,0 +1,12 @@
+{
+  "name": "golf-yardage",
+  "version": "1.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "serve": "python3 -m http.server 8000"
+  },
+  "engines": { "node": ">=20" },
+  "description": "C-015: static offline-first golf playing-distance calculator"
+}

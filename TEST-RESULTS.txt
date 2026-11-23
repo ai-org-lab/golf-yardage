@@ -1,0 +1,102 @@
+C-015 v1.2.0 テスト結果
+計39件（計算22・方位11・予報6）。受入試験1〜17は変更せずすべて整数で一致。
+計算・方位・予報のlibと単体テストはv1.1 ZIPの内容と同一であることを確認。
+
+Runtime
+$ node --version
+v24.22.3
+終了コード: 0
+
+npm test
+$ npm test
+
+> golf-yardage@1.2.0 test
+> node --test test/*.test.mjs
+
+✔ test/compass.test.mjs (106.842627ms)
+✔ test/weather.test.mjs (135.485233ms)
+✔ test/yardage.test.mjs (126.409071ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 156.333387
+終了コード: 0
+
+全計算テスト（受入試験1〜17を含む22件）
+$ node test/yardage.test.mjs
+✔ C-015 受入試験 1: 161 yd (3.462626ms)
+✔ C-015 受入試験 2: 168 yd (0.335967ms)
+✔ C-015 受入試験 3: 183 yd (0.167082ms)
+✔ C-015 受入試験 4: 161 yd (0.128213ms)
+✔ C-015 受入試験 5: 164 yd (0.174494ms)
+✔ C-015 受入試験 6: 106 yd (0.142715ms)
+✔ C-015 受入試験 7: 66 yd (0.314896ms)
+✔ C-015 受入試験 8: 202 yd (0.117567ms)
+✔ C-015 受入試験 9: 252 yd (1.105378ms)
+✔ C-015 受入試験 10: 160 yd (0.319412ms)
+✔ C-015 受入試験 11: 110 yd (0.184338ms)
+✔ C-015 受入試験 12: 183 yd (0.274164ms)
+✔ C-015 受入試験 13: 161 yd (0.090566ms)
+✔ C-015 受入試験 14: 168 yd (0.107883ms)
+✔ C-015 受入試験 15: 179 yd (0.076936ms)
+✔ C-015 受入試験 16: 163 yd (0.203647ms)
+✔ C-015 受入試験 17: 166 yd (0.076145ms)
+✔ nearest: ties favour longer club; missing clubs use fallback category (0.251689ms)
+✔ wind vectors: left/right, wrapped degrees, manual fallback, and no crosswind distance adjustment (0.956934ms)
+✔ invalid measured wind values are rejected (0.443529ms)
+✔ flat elevation, fixed club and huge elevation warning (0.242817ms)
+✔ blank temp/wind causes no adjustment; wind and input validation (0.130317ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 19.492027
+終了コード: 0
+
+方位モック11件
+$ node test/compass.test.mjs
+✔ Safari: requests permission synchronously on first tap; north (0°) is valid (2.079458ms)
+✔ Safari: permission is reused; each tap takes a new sample and then stops (0.339893ms)
+✔ denied permission leaves no listeners and may be retried (0.480264ms)
+✔ synchronous and asynchronous permission failures reject without listening (0.513956ms)
+✔ missing API and insecure origin keep manual fallback available (0.235586ms)
+✔ absolute alpha converts counterclockwise orientation to clockwise bearing (0.212641ms)
+✔ deviceorientationabsolute can supply a bearing even without absolute flag (0.226482ms)
+✔ relative alpha and unavailable samples are never treated as north (20.335591ms)
+✔ invalid samples can be followed by a valid compass sample (0.288325ms)
+✔ missing sensor events time out and remove both listeners (10.466716ms)
+✔ invalid timeout is rejected before requesting permission (0.241405ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 40.377738
+終了コード: 0
+
+予報モック6件
+$ node test/weather.test.mjs
+✔ Open-Meteo fetch mock: URL, hourly variables, units and timezone (1.458091ms)
+✔ forecast: five hours from 08:20 spans 08:00–13:00; current 10:40 picks 10:00 (13.821529ms)
+✔ 16 points of wind / arrows handle boundary (0.201965ms)
+✔ reject wrong units and missing entries (no fabricated forecast) (0.738074ms)
+✔ JST time has stable date and bounds across UTC (0.463409ms)
+✔ mock fetch non-2xx and malformed body are rejected (3.75686ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 26.688738
+終了コード: 0

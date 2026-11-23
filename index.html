@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#133e32">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="打つ距離">
+  <meta name="description" content="ゴルフ場の天気と高低差から打つ距離の目安を計算。オフライン対応。">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://api.open-meteo.com https://nominatim.openstreetmap.org; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <title>打つ距離 | Golf Yardage</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./assets/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.mjs"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="masthead">
+      <div class="brand"><div class="brand-icon" aria-hidden="true">◢</div><div><span class="brand-title">打つ距離<span class="brand-roman"> / YARDAGE</span></span><span class="brand-subtitle">風・気温・高低差を、1打の判断に。</span></div></div>
+      <div id="connection-pill" class="connection-pill" aria-live="polite">確認中</div>
+    </header>
+    <nav class="tabs" aria-label="メインメニュー">
+      <button type="button" class="tab active" data-tab="shot" aria-current="page">ショット</button>
+      <button type="button" class="tab" data-tab="round">ラウンド</button>
+      <button type="button" class="tab" data-tab="profile">マイ飛距離</button>
+      <button type="button" class="tab" data-tab="chart">早見表</button>
+    </nav>
+
+    <main>
+      <section id="panel-shot" class="tab-panel" aria-label="ショット計算">
+        <div class="panel-heading shot-heading"><span class="eyebrow">SHOT CALCULATOR</span><span id="shot-weather-summary" class="round-indicator">予報未設定</span></div>
+        <div class="shot-inputs">
+          <label class="main-input-card" for="shot-distance">
+            <span class="input-name">直線距離 <small>Bushnell</small></span>
+            <span class="input-with-unit"><input id="shot-distance" type="number" inputmode="decimal" min="1" max="600" step="any" placeholder="150" autocomplete="off"><span>yd</span></span>
+          </label>
+          <div class="main-input-card slope-card">
+            <label class="input-name" for="shot-slope">高低差 <small>勾配</small></label>
+            <span class="input-with-unit"><input id="shot-slope" type="number" inputmode="decimal" min="0" max="99" step="any" value="0" autocomplete="off"><span>%</span></span>
+            <div class="slope-buttons" role="group" aria-label="高低差の向き"><button type="button" id="slope-up" class="slope-button active" aria-pressed="true">＋ 上り</button><button type="button" id="slope-down" class="slope-button" aria-pressed="false">− 下り</button></div>
+          </div>
+        </div>
+
+        <section class="result-card" aria-live="polite" aria-atomic="true" aria-label="計算結果">
+          <div class="result-left"><span class="result-kicker">実際に打つ距離</span><div class="result-number"><strong id="result-distance">—</strong><span>yd</span></div><span class="result-caption">推定値 · 実測保証なし</span></div>
+          <div class="result-right"><span class="result-kicker">番手の目安</span><strong id="result-club">入力待ち</strong><span id="result-bracket" class="bracket">距離を入力してください</span></div>
+        </section>
+        <div id="breakdown" class="breakdown" aria-label="距離の内訳"><span>高低差 <b id="breakdown-elevation">—</b></span><span>気温 <b id="breakdown-temperature">—</b></span><span>風 <b id="breakdown-wind">—</b></span></div>
+        <p class="wind-result"><strong id="result-wind-components" aria-live="polite">向かい 0.0m/s・横 0.0m/s</strong><small>横の分は距離に含めません</small></p>
+        <p id="shot-warning" class="warning" hidden></p>
+
+        <div class="section-divider"><span>風とコンディション</span><small>1打ごとに変更</small></div>
+        <div class="heading-control"><button type="button" id="measure-heading" class="outline-button" aria-pressed="false" aria-describedby="heading-help heading-status">向きを測る</button><span id="heading-status" role="status">未測定：向かい・追い・横を選べます。</span></div>
+        <p id="heading-help" class="small-muted">スマホの画面を上にして平らに持ち、上の端を旗に向けてタップ。測定が終わるまでそのまま保持。向きは3分で未測定に戻ります。測れない場合は下から選択できます。</p>
+        <div class="wind-selector" role="group" aria-label="風との関係"><button type="button" data-wind="head" aria-pressed="false">向かい風</button><button type="button" data-wind="tail" aria-pressed="false">追い風</button><button type="button" data-wind="cross" aria-pressed="true" class="active">横風</button></div>
+        <div class="environment-grid">
+          <label class="field"><span>気温 <em id="temp-source" class="source-tag">未取得</em></span><span class="field-input"><input id="shot-temperature" type="number" inputmode="decimal" step="any" placeholder="未取得"><small>℃</small></span></label>
+          <label class="field"><span>風速 <em id="wind-source" class="source-tag">未取得</em></span><span class="field-input"><input id="shot-wind" type="number" inputmode="decimal" step="any" min="0" placeholder="未取得"><small>m/s</small></span></label>
+        </div>
+        <div class="wind-adjust" role="group" aria-label="体感で風速を調整"><span>体感で調整</span><button type="button" id="wind-decrease" aria-label="風速を1m/s下げる">−1</button><button type="button" id="wind-increase" aria-label="風速を1m/s上げる">＋1</button><small>m/s</small></div>
+        <div class="weather-hint"><span id="shot-direction">風向：予報未取得</span><button type="button" id="go-round" class="subtle-button">天気を設定 →</button></div>
+
+        <details class="advanced"><summary>計算方法・番手を変更</summary><div class="advanced-inner"><label class="field" for="curve-mode">高低差の計算<select id="curve-mode"><option value="arc">球筋で補正</option><option value="simple">シンプル</option></select></label><label class="field" for="fixed-club">高低差の計算に使う番手<select id="fixed-club"><option value="">自動で選ぶ</option></select></label></div></details>
+        <p class="disclaimer">練習・一般のプライベートラウンド向けの概算です。競技ラウンド中の高低差補正・推奨番手の利用はゴルフ規則 4.3a に抵触します。</p>
+      </section>
+
+      <section id="panel-round" class="tab-panel" aria-label="ラウンド設定" hidden>
+        <div class="section-top"><div><span class="eyebrow">ROUND SETUP</span><h1>ラウンド設定</h1></div><span class="tiny-note">天気はゴルフ場の地点で取得</span></div>
+        <section class="surface"><h2>登録済みのゴルフ場</h2><label class="field" for="saved-courses"><span>ゴルフ場を選択</span><select id="saved-courses"><option value="">ゴルフ場を登録してください</option></select></label><p id="selected-course-coordinates" class="small-muted">未選択</p><button type="button" id="remove-course" class="text-danger" disabled>選択したゴルフ場を削除</button></section>
+        <section class="surface"><h2>名前で検索 <span class="mini-label">OpenStreetMap</span></h2><p class="small-muted">検索ボタンを押したときだけ検索します。候補の地点を確かめて登録してください。</p><div class="inline-search"><input id="course-query" type="search" placeholder="例：〇〇ゴルフクラブ" maxlength="100"><button type="button" id="search-course" class="action-button">検索</button></div><div id="search-results" class="search-results" aria-live="polite"></div></section>
+        <section class="surface"><h2>現在地・緯度経度で登録</h2><label class="field" for="manual-name"><span>ゴルフ場名</span><input id="manual-name" type="text" placeholder="例：いつもの練習コース" maxlength="100"></label><div class="form-grid"><label class="field" for="manual-lat"><span>緯度（-90〜90）</span><input id="manual-lat" type="number" inputmode="decimal" step="any" placeholder="34.7000"></label><label class="field" for="manual-lon"><span>経度（-180〜180）</span><input id="manual-lon" type="number" inputmode="decimal" step="any" placeholder="135.5000"></label></div><div class="action-row"><button type="button" id="use-location" class="outline-button">現在地を使う</button><button type="button" id="register-manual" class="action-button">この地点を登録</button></div><p class="small-muted">現在地は端末で許可したときだけ使用。ゴルフ場の中心地点とは限りません。</p></section>
+        <section class="surface"><h2>ラウンド日時 <span class="mini-label">日本時間</span></h2><div class="form-grid"><label class="field" for="round-date"><span>ラウンド日</span><input id="round-date" type="date"></label><label class="field" for="round-time"><span>スタート時刻</span><input id="round-time" type="time"></label></div><button type="button" class="action-button wide" id="refresh-weather">予報を更新</button><p id="forecast-state" class="small-muted" role="status">ゴルフ場を選ぶと予報を取得します。</p></section>
+        <section class="surface"><h2>時間別予報 <span class="mini-label">スタートから5時間</span></h2><p class="small-muted">計算に使う時間をタップすると、気温と風速が自動で入ります。ラウンド中は現在時刻を優先します。</p><div class="table-scroll"><table class="weather-table"><thead><tr><th>時刻</th><th>気温</th><th>風速</th><th>突風</th><th>風向（吹いてくる方角）</th></tr></thead><tbody id="weather-table-body"><tr><td colspan="5">ゴルフ場を選んでください</td></tr></tbody></table></div><p id="fetched-at" class="small-muted"></p></section>
+        <p class="attribution">Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo.com</a>（<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>） · © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a></p>
+      </section>
+
+      <section id="panel-profile" class="tab-panel" aria-label="マイ飛距離" hidden>
+        <div class="section-top"><div><span class="eyebrow">MY CARRIES</span><h1>マイ飛距離</h1></div></div>
+        <p class="lead">夏に測ったキャリーを登録。数字を修正すると、その番手の「推定」表示が消えます。空欄の番手は計算から除外します。</p>
+        <section class="surface"><label class="field baseline-temp" for="base-temperature"><span>キャリーを測ったときの気温</span><span class="field-input"><input id="base-temperature" type="number" step="any" inputmode="decimal" value="30"><small>℃</small></span></label></section>
+        <section class="surface"><div class="section-line"><h2>番手別キャリー</h2><small>単位：yd</small></div><div class="club-table-head"><span>番手</span><span>キャリー</span><span>種類・精度</span></div><div id="club-rows"></div><button type="button" id="reset-clubs" class="outline-button wide">初期値に戻す</button></section>
+        <section class="surface"><h2>設定の書き出し・読み込み</h2><p class="small-muted">テキストをコピーして保管できます。読み込むと登録ゴルフ場とマイ飛距離を上書きします。予報キャッシュは含みません。</p><textarea id="settings-json" rows="7" spellcheck="false" placeholder="書き出したJSONをここに貼り付け"></textarea><div class="action-row"><button type="button" class="outline-button" id="export-settings">書き出す</button><button type="button" class="outline-button" id="copy-settings">コピー</button><button type="button" class="action-button" id="import-settings">読み込む</button></div><p class="small-muted" id="settings-status" role="status"></p></section>
+      </section>
+
+      <section id="panel-chart" class="tab-panel" aria-label="高低差の早見表" hidden>
+        <div class="section-top"><div><span class="eyebrow">QUICK REFERENCE</span><h1>高低差の早見表</h1></div></div><p class="lead">縦は直線距離、横は高低差。ショット画面の気温・風速・風向・計算方法で補正した数字です。数字をタップすると入力できます。</p><div class="chart-note" id="chart-condition">現在の補正条件：なし</div><div class="table-scroll chart-scroll"><table class="reference-table"><thead id="reference-head"></thead><tbody id="reference-body"></tbody></table></div>
+      </section>
+    </main>
+    <footer class="app-footer">C-015 · 端末内に設定保存 · キー・追跡なし<br>競技中は高低差補正・推奨番手を使わないでください。</footer>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+</body>
+</html>
