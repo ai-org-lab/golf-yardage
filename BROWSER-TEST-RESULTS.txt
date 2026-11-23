@@ -1,15 +1,23 @@
 PASS: v1.2 −下り→5→3、空欄・0を経由しても下りを保持、欄は数字のみ
 PASS: v1.2 −5の直接入力は下り、＋選択後の再入力は上りを保持
-PASS: UI 方位モック受入試験 12: 183 yd; 向かい 4.0m/s
-PASS: UI 方位モック受入試験 13: 161 yd; 追い 4.0m/s
+PASS: UI 方位モック受入試験 12: 183 yd; アゲインスト 4.0m/s
+PASS: UI 方位モック受入試験 13: 161 yd; フォロー 4.0m/s
 PASS: UI 方位モック受入試験 14: 168 yd; 左から 4.0m/s
-PASS: UI 方位モック受入試験 15: 179 yd; 向かい 2.8m/s・左から 2.8m/s
-PASS: UI 方位モック受入試験 16: 163 yd; 追い 2.8m/s・左から 2.8m/s
-PASS: UI 方位モック受入試験 17: 166 yd; 追い 5.0m/s
+PASS: UI 方位モック受入試験 15: 179 yd; アゲインスト 2.8m/s・左から 2.8m/s
+PASS: UI 方位モック受入試験 16: 163 yd; フォロー 2.8m/s・左から 2.8m/s
+PASS: UI 方位モック受入試験 17: 166 yd; フォロー 5.0m/s
+PASS: v1.3 風の3ボタンはアゲインスト・フォロー・横風、フォロー1.0m/s・右から0.5m/sも新表記
+PASS: v1.3 自動・手動の早見表条件もアゲインスト・フォローで統一
 PASS: v1.2 方位は179秒まで有効、180秒で未測定に戻り距離・風成分も再計算
 PASS: v1.2 入力前の方位測定も同じ180秒で解除、途中の距離・高低差入力は期限を延長しない
 PASS: v1.2 測り直しは新しい測定時刻から3分間有効
 PASS: v1.2 タイマーが止まったタブの復帰時にも期限切れ方位を解除
 PASS: compass permission-on-tap, six heading mocks, one-shot capture, manual fallback/race, decimal wind +/-1, zero clamp, reference projection, offline compass
+PASS: v1.3 日本語変換中・keyCode229のEnterは検索せず、通常Enterだけ検索
+PASS: v1.3 1秒制限は結果欄に残り、次の成功検索で候補へ更新
+PASS: v1.3 HTTP検索エラーはお知らせ消去後も結果欄で読める
+PASS: v1.3 オフライン・入力エラーも結果欄に残り、候補なしにはGoogleマップの案内
+PASS: v1.3 1行座標と緯度欄へのカンマ区切り貼り付けで緯度・経度を分割し、精度と負号を維持して登録
+PASS: v1.3 不正な座標は前の値で誤登録しない、390pxの横はみ出しなし
 PASS: 390px viewport, math UI, saved clubs, JSON import/export, search-on-click, 5-hour forecast, offline service worker, cached weather; mocks={'weather': 2, 'search': 1}
 Screenshots: screenshots/iphone-390-shot.png, screenshots/iphone-390-round.png

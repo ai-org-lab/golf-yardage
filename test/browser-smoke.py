@@ -53,6 +53,18 @@ COMPASS_MOCK = """(() => {
 })();"""
 
 
+def assert_wind_vocabulary(page):
+    """Visible shot copy, including fallback messages, uses the approved terms."""
+    expect(page.locator("[data-wind='head']")).to_have_text('アゲインスト')
+    expect(page.locator("[data-wind='tail']")).to_have_text('フォロー')
+    expect(page.locator("[data-wind='cross']")).to_have_text('横風')
+    shot_text = page.locator('#panel-shot').inner_text()
+    assert '向かい' not in shot_text and '追い' not in shot_text
+    assert page.evaluate('() => document.documentElement.scrollWidth <= innerWidth')
+    for selector in ["[data-wind='head']", "[data-wind='tail']", "[data-wind='cross']"]:
+        assert page.locator(selector).evaluate('(button) => button.scrollWidth <= button.clientWidth')
+
+
 def compass_ui_tests(browser, origin):
     """Real app integration with browser APIs and forecast data fully mocked."""
     data = dated_forecast()
@@ -91,6 +103,7 @@ def compass_ui_tests(browser, origin):
         page.locator('#weather-table-body tr').first.click()
         page.locator('#shot-distance').fill('150')
         page.locator('#shot-slope').fill('7')
+        assert_wind_vocabulary(page)
         return context, page
 
     def refresh(page):
@@ -108,12 +121,12 @@ def compass_ui_tests(browser, origin):
     set_weather()
     context, page = new_page()
     cases = [
-        (12, 150, 7, 8, 4, 0, 0, 183, '向かい 4.0m/s'),
-        (13, 150, 7, 8, 4, 0, 180, 161, '追い 4.0m/s'),
+        (12, 150, 7, 8, 4, 0, 0, 183, 'アゲインスト 4.0m/s'),
+        (13, 150, 7, 8, 4, 0, 180, 161, 'フォロー 4.0m/s'),
         (14, 150, 7, 8, 4, 0, 90, 168, '左から 4.0m/s'),
-        (15, 150, 7, 8, 4, 0, 45, 179, '向かい 2.8m/s・左から 2.8m/s'),
-        (16, 150, 7, 8, 4, 315, 90, 163, '追い 2.8m/s・左から 2.8m/s'),
-        (17, 180, -6, 10, 5, 200, 20, 166, '追い 5.0m/s'),
+        (15, 150, 7, 8, 4, 0, 45, 179, 'アゲインスト 2.8m/s・左から 2.8m/s'),
+        (16, 150, 7, 8, 4, 315, 90, 163, 'フォロー 2.8m/s・左から 2.8m/s'),
+        (17, 180, -6, 10, 5, 200, 20, 166, 'フォロー 5.0m/s'),
     ]
     for n, line, grade, temperature, wind, direction, heading, want, components in cases:
         set_weather(temperature, wind, direction)
@@ -128,7 +141,23 @@ def compass_ui_tests(browser, origin):
         assert page.evaluate('() => __compass.activations') == [True]
         page.evaluate('() => __emitHeading(123)')
         expect(page.locator('#result-distance')).to_have_text(str(want))
+        assert_wind_vocabulary(page)
         print(f'PASS: UI 方位モック受入試験 {n}: {want} yd; {components}')
+
+    # A southeast source gives a follow component and wind from the right.
+    set_weather(wind=1.25 ** 0.5, direction=153.434948822922)
+    refresh(page)
+    page.locator('#shot-distance').fill('150')
+    page.locator('#slope-up').click()
+    page.locator('#shot-slope').fill('7')
+    measure(page, 0)
+    expect(page.locator('#result-wind-components')).to_have_text('フォロー 1.0m/s・右から 0.5m/s')
+    assert_wind_vocabulary(page)
+    page.locator("[data-tab='chart']").click()
+    expect(page.locator('#chart-condition')).to_contain_text('フォロー 1.0m/s・右から 0.5m/s')
+    expect(page.locator('#chart-condition')).not_to_contain_text('追い')
+    page.locator("[data-tab='shot']").click()
+    print('PASS: v1.3 風の3ボタンはアゲインスト・フォロー・横風、フォロー1.0m/s・右から0.5m/sも新表記')
 
     # Measured projection also applies in the reference table and stays consistent.
     set_weather()
@@ -139,6 +168,8 @@ def compass_ui_tests(browser, origin):
     measure(page, 45)
     shot_distance = page.locator('#result-distance').inner_text()
     page.locator("[data-tab='chart']").click()
+    expect(page.locator('#chart-condition')).to_contain_text('アゲインスト 2.8m/s・左から 2.8m/s')
+    expect(page.locator('#chart-condition')).not_to_contain_text('向かい')
     cell = page.locator('#reference-body tr').nth(9).locator('button').nth(5)
     expect(cell).to_have_text(shot_distance)
     cell.click()
@@ -171,10 +202,19 @@ def compass_ui_tests(browser, origin):
     page.evaluate('() => __emitHeading(180)')
     expect(page.locator('#result-distance')).to_have_text('183')
     expect(page.locator("[data-wind='head']")).to_have_attribute('aria-pressed', 'true')
+    page.locator("[data-tab='chart']").click()
+    expect(page.locator('#chart-condition')).to_contain_text('アゲインスト 4.0m/s')
+    expect(page.locator('#chart-condition')).not_to_contain_text('向かい')
+    page.locator("[data-tab='shot']").click()
     page.locator("[data-wind='tail']").click()
     expect(page.locator('#result-distance')).to_have_text('161')
+    page.locator("[data-tab='chart']").click()
+    expect(page.locator('#chart-condition')).to_contain_text('フォロー 4.0m/s')
+    expect(page.locator('#chart-condition')).not_to_contain_text('追い')
+    page.locator("[data-tab='shot']").click()
     page.locator("[data-wind='cross']").click()
     expect(page.locator('#result-distance')).to_have_text('168')
+    print('PASS: v1.3 自動・手動の早見表条件もアゲインスト・フォローで統一')
 
     # Offline reload must include the newly introduced compass module.
     page.evaluate('() => navigator.serviceWorker.ready.then(() => true)')
@@ -208,7 +248,7 @@ def compass_ui_tests(browser, origin):
     expect(expiry.locator('#heading-status')).to_contain_text('未測定')
     expect(expiry.locator('#measure-heading')).to_have_attribute('aria-pressed', 'false')
     expect(expiry.locator('#result-distance')).to_have_text('168')
-    expect(expiry.locator('#result-wind-components')).to_have_text('向かい 0.0m/s・横 4.0m/s')
+    expect(expiry.locator('#result-wind-components')).to_have_text('アゲインスト 0.0m/s・横 4.0m/s')
     print('PASS: v1.2 方位は179秒まで有効、180秒で未測定に戻り距離・風成分も再計算')
 
     # Measure before any shot inputs; entering them after 90s must not reset age.
@@ -260,6 +300,7 @@ def compass_ui_tests(browser, origin):
         fallback_context, fallback = new_page(permission, supported)
         fallback.locator('#measure-heading').click()
         expect(fallback.locator('#measure-heading')).to_be_enabled()
+        assert_wind_vocabulary(fallback)
         fallback.locator("[data-wind='head']").click()
         expect(fallback.locator('#result-distance')).to_have_text('183')
         fallback.locator("[data-wind='tail']").click()
@@ -275,11 +316,158 @@ def compass_ui_tests(browser, origin):
     timeout_page.evaluate("() => dispatchEvent(new DeviceOrientationEvent('deviceorientation', {alpha: 0, absolute: false}))")
     timeout_page.clock.fast_forward(6100)
     expect(timeout_page.locator('#measure-heading')).to_be_enabled()
+    assert_wind_vocabulary(timeout_page)
     timeout_page.locator("[data-wind='head']").click()
     expect(timeout_page.locator('#result-distance')).to_have_text('183')
     timeout_context.close()
     assert not errors, errors
     print('PASS: compass permission-on-tap, six heading mocks, one-shot capture, manual fallback/race, decimal wind +/-1, zero clamp, reference projection, offline compass')
+
+
+def search_and_coordinates_ui_tests(browser, origin):
+    """v1.3: Japanese IME, durable search feedback and Maps coordinate paste."""
+    errors, requests = [], []
+    response = {'status': 200, 'body': NOMINATIM}
+    context = browser.new_context(viewport={'width': 390, 'height': 844},
+                                  is_mobile=True, has_touch=True,
+                                  locale='ja-JP', timezone_id='Asia/Tokyo')
+    context.route('https://**', lambda route: route.abort())
+    context.route('https://api.open-meteo.com/**', lambda route: route.fulfill(
+        status=200, content_type='application/json', body=json.dumps(dated_forecast())))
+
+    def search_mock(route):
+        requests.append(route.request.url)
+        route.fulfill(status=response['status'], content_type='application/json', body=response['body'])
+
+    context.route('https://nominatim.openstreetmap.org/**', search_mock)
+    context.add_init_script("""(() => {
+        const originalFetch = window.fetch;
+        window.__searchFetches = [];
+        window.fetch = (...args) => {
+            if (String(args[0]).startsWith('https://nominatim.openstreetmap.org/')) {
+                __searchFetches.push(String(args[0]));
+            }
+            return originalFetch(...args);
+        };
+    })();""")
+    page = context.new_page()
+    page.on('pageerror', lambda error: errors.append(str(error)))
+    try:
+        page.goto(f'{origin}/index.html', wait_until='networkidle')
+        page.clock.install()
+        page.clock.pause_at(datetime.now(ZoneInfo('Asia/Tokyo')) + timedelta(seconds=1))
+        page.locator("[data-tab='round']").click()
+        query = page.locator('#course-query')
+        results = page.locator('#search-results')
+        query.fill('変換確認ゴルフ場')
+        for options in [{'isComposing': True, 'keyCode': 13}, {'isComposing': False, 'keyCode': 229}]:
+            query.evaluate("""(input, options) => input.dispatchEvent(new KeyboardEvent('keydown', {
+                bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', ...options,
+            }))""", options)
+            assert page.evaluate('() => __searchFetches.length') == 0
+            assert not requests
+            expect(results).not_to_contain_text('検索は1秒に1回までです')
+        with page.expect_response('https://nominatim.openstreetmap.org/**'):
+            query.press('Enter')
+        expect(results.locator('.search-hit')).to_have_count(1)
+        assert len(requests) == 1
+        print('PASS: v1.3 日本語変換中・keyCode229のEnterは検索せず、通常Enterだけ検索')
+
+        # The rate-limit message remains readable after the transient toast ends.
+        query.fill('連続検索ゴルフ場')
+        page.locator('#search-course').click()
+        expect(results).to_contain_text('検索は1秒に1回までです')
+        page.clock.fast_forward(5000)
+        expect(page.locator('#toast')).to_be_hidden()
+        expect(results).to_contain_text('検索は1秒に1回までです')
+        assert len(requests) == 1
+        with page.expect_response('https://nominatim.openstreetmap.org/**'):
+            page.locator('#search-course').click()
+        expect(results.locator('.search-hit')).to_have_count(1)
+        expect(results).not_to_contain_text('検索は1秒に1回までです')
+        print('PASS: v1.3 1秒制限は結果欄に残り、次の成功検索で候補へ更新')
+
+        response.update(status=503, body='{}')
+        page.clock.fast_forward(1000)
+        query.fill('通信失敗ゴルフ場')
+        with page.expect_response('https://nominatim.openstreetmap.org/**'):
+            page.locator('#search-course').click()
+        expect(results).to_contain_text('失敗')
+        expect(results).to_contain_text('503')
+        page.clock.fast_forward(5000)
+        expect(page.locator('#toast')).to_be_hidden()
+        expect(results).to_contain_text('503')
+        print('PASS: v1.3 HTTP検索エラーはお知らせ消去後も結果欄で読める')
+
+        context.set_offline(True)
+        query.fill('オフライン確認ゴルフ場')
+        page.locator('#search-course').click()
+        expect(results).to_contain_text('通信')
+        page.clock.fast_forward(5000)
+        expect(page.locator('#toast')).to_be_hidden()
+        expect(results).to_contain_text('通信')
+        context.set_offline(False)
+        query.fill('あ')
+        page.locator('#search-course').click()
+        expect(results).to_contain_text('2文字')
+        page.clock.fast_forward(5000)
+        expect(page.locator('#toast')).to_be_hidden()
+        expect(results).to_contain_text('2文字')
+
+        response.update(status=200, body='[]')
+        query.fill('候補なしゴルフ場')
+        with page.expect_response('https://nominatim.openstreetmap.org/**'):
+            page.locator('#search-course').click()
+        expect(results).to_contain_text('Google マップで場所を長押しして出る数字を貼ると登録できます')
+        print('PASS: v1.3 オフライン・入力エラーも結果欄に残り、候補なしにはGoogleマップの案内')
+
+        # One-line paste keeps the full precision in both fields and saved settings.
+        page.locator('#manual-name').fill('Googleマップの座標')
+        page.locator('#manual-coordinates').fill('34.5111495, 135.5865954')
+        expect(page.locator('#manual-lat')).to_have_value('34.5111495')
+        expect(page.locator('#manual-lon')).to_have_value('135.5865954')
+        page.locator('#register-manual').click()
+        courses = page.evaluate("() => JSON.parse(localStorage.getItem('golf-yardage-v1-settings')).courses")
+        assert len(courses) == 1
+        assert courses[0]['latitude'] == 34.5111495 and courses[0]['longitude'] == 135.5865954
+
+        # Synthetic clipboard supplies the same text to the existing number input.
+        page.locator('#manual-name').fill('緯度欄への貼り付け')
+        page.locator('#manual-lat').evaluate("""(input, text) => {
+            const clipboard = new DataTransfer();
+            clipboard.setData('text/plain', text);
+            input.dispatchEvent(new ClipboardEvent('paste', {
+                bubbles: true, cancelable: true, clipboardData: clipboard,
+            }));
+        }""", '35.1234567, 139.7654321')
+        expect(page.locator('#manual-lat')).to_have_value('35.1234567')
+        expect(page.locator('#manual-lon')).to_have_value('139.7654321')
+        page.locator('#register-manual').click()
+        courses = page.evaluate("() => JSON.parse(localStorage.getItem('golf-yardage-v1-settings')).courses")
+        assert len(courses) == 2
+        assert courses[-1]['latitude'] == 35.1234567 and courses[-1]['longitude'] == 139.7654321
+
+        page.locator('#manual-name').fill('南緯・西経の座標')
+        page.locator('#manual-coordinates').fill(' -33.8688 , -70.6693 ')
+        expect(page.locator('#manual-lat')).to_have_value('-33.8688')
+        expect(page.locator('#manual-lon')).to_have_value('-70.6693')
+        page.locator('#register-manual').click()
+        courses = page.evaluate("() => JSON.parse(localStorage.getItem('golf-yardage-v1-settings')).courses")
+        assert len(courses) == 3
+        assert courses[-1]['latitude'] == -33.8688 and courses[-1]['longitude'] == -70.6693
+        print('PASS: v1.3 1行座標と緯度欄へのカンマ区切り貼り付けで緯度・経度を分割し、精度と負号を維持して登録')
+
+        page.locator('#manual-name').fill('不正な範囲の座標')
+        page.locator('#manual-coordinates').fill('91, 181')
+        page.locator('#register-manual').click()
+        courses = page.evaluate("() => JSON.parse(localStorage.getItem('golf-yardage-v1-settings')).courses")
+        assert len(courses) == 3, 'Invalid coordinate pair registered stale previous values'
+        assert page.evaluate('() => document.documentElement.scrollWidth <= innerWidth')
+        print('PASS: v1.3 不正な座標は前の値で誤登録しない、390pxの横はみ出しなし')
+        assert not errors, errors
+    finally:
+        context.close()
+
 
 class QuietHandler(SimpleHTTPRequestHandler):
     def log_message(self, *_):
@@ -424,6 +612,7 @@ def main():
             assert not errors, errors
             context.close()
             compass_ui_tests(browser, f'http://127.0.0.1:{server.server_port}')
+            search_and_coordinates_ui_tests(browser, f'http://127.0.0.1:{server.server_port}')
             browser.close()
         print(f"PASS: 390px viewport, math UI, saved clubs, JSON import/export, search-on-click, 5-hour forecast, offline service worker, cached weather; mocks={counts}")
         print('Screenshots: screenshots/iphone-390-shot.png, screenshots/iphone-390-round.png')

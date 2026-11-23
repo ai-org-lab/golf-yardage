@@ -9,6 +9,7 @@ const SEARCH_LAST_KEY = 'golf-yardage-v1-last-search-at';
 const TODAY = jstParts();
 const MAX_DATE = addDays(TODAY.date, 16);
 const HEADING_LIFETIME_MS = 3 * 60_000;
+const MAP_COORDINATES_HINT = 'Google マップで場所を長押しして出る数字を貼ると登録できます';
 const byId = id => document.getElementById(id);
 
 function safeParse(key, fallback) {
@@ -65,8 +66,8 @@ const state = {
   manualWeatherIndex: null, selectedWeatherIndex: -1, appliedWeatherKey: null,
   windRelation: 'cross', envTemp: null, envWind: null, tempSource: 'unset', windSource: 'unset',
   envWindDirection: null, shotHeading: null, headingMeasuredAt: null, headingRequestSerial: 0,
-  headingMessage: '未測定：向かい・追い・横を選べます。',
-  requestSerial: 0, activeTab: 'shot', slopeNegative: false,
+  headingMessage: '未測定：アゲインスト・フォロー・横風を選べます。',
+  requestSerial: 0, activeTab: 'shot', slopeNegative: false, searchPending: false,
 };
 if (!state.weatherCache || Array.isArray(state.weatherCache) || typeof state.weatherCache !== 'object') state.weatherCache = {};
 let toastTimeout;
@@ -125,7 +126,7 @@ function updateSources() {
 function hasMeasuredWind() {
   return state.shotHeading !== null && state.envWindDirection !== null;
 }
-function clearMeasuredHeading(message = '未測定：向かい・追い・横を選べます。') {
+function clearMeasuredHeading(message = '未測定：アゲインスト・フォロー・横風を選べます。') {
   clearTimeout(headingTimeout);
   state.shotHeading = null;
   state.headingMeasuredAt = null;
@@ -156,7 +157,7 @@ function refreshHeading() {
 }
 function describeWind(components) {
   const { headwind, crosswind, measured } = components;
-  const front = `${headwind < 0 ? '追い' : '向かい'} ${Math.abs(headwind).toFixed(1)}m/s`;
+  const front = `${headwind < 0 ? 'フォロー' : 'アゲインスト'} ${Math.abs(headwind).toFixed(1)}m/s`;
   const side = measured && Math.abs(crosswind) >= 0.05 ? (crosswind < 0 ? '左から' : '右から') : '横';
   return `${front}・${side} ${Math.abs(crosswind).toFixed(1)}m/s`;
 }
@@ -166,7 +167,7 @@ function renderHeadingStatus() {
     : `・${Math.floor(Math.max(0, Date.now() - state.headingMeasuredAt) / 1000)}秒前に測定`;
   byId('measure-heading').setAttribute('aria-pressed', String(measured));
   byId('heading-status').textContent = state.shotHeading === null ? state.headingMessage
-    : `打つ向き ${Math.round(state.shotHeading) % 360}°${age}${measured ? '（自動）' : '：予報の風向がありません。向かい・追い・横を選んでください。'}`;
+    : `打つ向き ${Math.round(state.shotHeading) % 360}°${age}${measured ? '（自動）' : '：予報の風向がありません。アゲインスト・フォロー・横風を選んでください。'}`;
 }
 function renderWind() {
   expireHeading();
@@ -426,10 +427,19 @@ function addCourse(raw) {
   switchCourse(item.id);
   notify('ゴルフ場を端末に登録しました。');
 }
+function showSearchMessage(message, toast = false) {
+  byId('search-results').textContent = message;
+  if (toast) notify(message);
+}
+function showNoSearchResults() {
+  showSearchMessage(`候補がありません。別の名前か緯度・経度で登録してください。${MAP_COORDINATES_HINT}。`);
+}
 function renderSearchResults(results) {
   const container = byId('search-results'); container.replaceChildren();
-  if (!Array.isArray(results) || !results.length) { container.textContent = '候補がありません。別の名前か緯度・経度で登録してください。'; return; }
+  if (!Array.isArray(results) || !results.length) { showNoSearchResults(); return; }
   for (const result of results.slice(0, 6)) {
+    if (!result || result.lat === null || result.lon === null
+      || String(result.lat ?? '').trim() === '' || String(result.lon ?? '').trim() === '') continue;
     const lat = Number(result.lat), lon = Number(result.lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) continue;
     const button = document.createElement('button'); button.className = 'search-hit'; button.type = 'button';
@@ -443,19 +453,23 @@ function renderSearchResults(results) {
     });
     container.append(button);
   }
+  if (!container.childElementCount) showNoSearchResults();
 }
 async function searchCourses() {
+  if (state.searchPending) return;
   const query = byId('course-query').value.trim().replace(/\s+/g, ' ');
-  if (query.length < 2 || query.length > 100) { notify('2文字以上のゴルフ場名を入力してください。'); return; }
+  if (query.length < 2 || query.length > 100) { showSearchMessage('2文字以上のゴルフ場名を入力してください。', true); return; }
   const cache = safeParse(SEARCH_KEY, {});
   if (cache && cache[query] && Date.now() - cache[query].at < 30 * 24 * 3600_000) {
     renderSearchResults(cache[query].results); notify('保存済みの検索結果を表示しました。'); return;
   }
   let last = 0;
   try { last = Number(localStorage.getItem(SEARCH_LAST_KEY) || 0); } catch { /* storage unavailable */ }
-  if (Date.now() - last < 1000) { notify('検索は1秒に1回までです。'); return; }
-  if (!navigator.onLine) { notify('名前での検索には通信が必要です。'); return; }
+  if (Date.now() - last < 1000) { showSearchMessage('検索は1秒に1回までです。', true); return; }
+  if (!navigator.onLine) { showSearchMessage('名前での検索には通信が必要です。', true); return; }
   const button = byId('search-course'); button.disabled = true;
+  state.searchPending = true;
+  showSearchMessage('検索中…');
   try {
     try { localStorage.setItem(SEARCH_LAST_KEY, String(Date.now())); } catch { /* storage unavailable */ }
     const url = new URL('https://nominatim.openstreetmap.org/search');
@@ -471,8 +485,29 @@ async function searchCourses() {
     for (const key of keys.slice(12)) delete saved[key];
     store(SEARCH_KEY, saved);
     renderSearchResults(results);
-  } catch (error) { notify(`ゴルフ場検索に失敗：${error.message}。手入力も使えます。`); }
-  finally { button.disabled = false; }
+  } catch (error) { showSearchMessage(`ゴルフ場検索に失敗：${error.message}。手入力も使えます。`, true); }
+  finally { button.disabled = false; state.searchPending = false; }
+}
+function parseCoordinatePair(text) {
+  const parts = text.normalize('NFKC').trim().split(',').map(part => part.trim());
+  const decimal = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+  if (parts.length !== 2 || parts.some(part => !decimal.test(part))) return null;
+  const [latitude, longitude] = parts.map(Number);
+  if (!Number.isFinite(latitude) || Math.abs(latitude) > 90
+    || !Number.isFinite(longitude) || Math.abs(longitude) > 180) return null;
+  return { latitude, longitude };
+}
+function applyCoordinatePair(text) {
+  const pair = parseCoordinatePair(text);
+  byId('manual-lat').value = pair ? String(pair.latitude) : '';
+  byId('manual-lon').value = pair ? String(pair.longitude) : '';
+  byId('coordinates-status').textContent = pair ? '緯度・経度を下の欄に入れました。地点名を確認して登録してください。'
+    : text.trim() ? '「緯度, 経度」の順で貼ってください。緯度は−90〜90、経度は−180〜180です。' : '';
+  return Boolean(pair);
+}
+function clearCoordinatePair() {
+  byId('manual-coordinates').value = '';
+  byId('coordinates-status').textContent = '';
 }
 function renderProfile() {
   byId('base-temperature').value = String(state.settings.baseTemperatureC);
@@ -571,7 +606,7 @@ function bindEvents() {
   byId('slope-up').addEventListener('click', () => setSlope(false));
   byId('slope-down').addEventListener('click', () => setSlope(true));
   for (const button of document.querySelectorAll('[data-wind]')) button.addEventListener('click', () => {
-    state.headingRequestSerial++; clearMeasuredHeading('手動：向かい・追い・横を選択中。');
+    state.headingRequestSerial++; clearMeasuredHeading('手動：アゲインスト・フォロー・横風を選択中。');
     state.windRelation = button.dataset.wind; renderShot();
   });
   byId('measure-heading').addEventListener('click', measureHeading);
@@ -595,8 +630,24 @@ function bindEvents() {
     }
   });
   byId('search-course').addEventListener('click', searchCourses);
-  byId('course-query').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); void searchCourses(); } });
+  byId('course-query').addEventListener('keydown', event => {
+    if (event.isComposing || event.keyCode === 229) return;
+    if (event.key === 'Enter') { event.preventDefault(); void searchCourses(); }
+  });
+  byId('manual-coordinates').addEventListener('input', () => applyCoordinatePair(byId('manual-coordinates').value));
+  for (const id of ['manual-lat', 'manual-lon']) byId(id).addEventListener('input', clearCoordinatePair);
+  byId('manual-lat').addEventListener('paste', event => {
+    const text = event.clipboardData?.getData('text/plain') || '';
+    if (!/[,，]/.test(text)) return;
+    event.preventDefault();
+    byId('manual-coordinates').value = text.trim();
+    applyCoordinatePair(text);
+  });
   byId('register-manual').addEventListener('click', () => {
+    const pairText = byId('manual-coordinates').value.trim();
+    if (pairText && !applyCoordinatePair(pairText)) {
+      notify(byId('coordinates-status').textContent); return;
+    }
     if (byId('manual-lat').value === '' || byId('manual-lon').value === '') {
       notify('緯度と経度を両方入力してください。'); return;
     }
@@ -608,6 +659,7 @@ function bindEvents() {
     byId('use-location').disabled = true;
     navigator.geolocation.getCurrentPosition(position => {
       byId('use-location').disabled = false;
+      clearCoordinatePair();
       byId('manual-lat').value = String(position.coords.latitude);
       byId('manual-lon').value = String(position.coords.longitude);
       addCourse({ id: randomId(), name: byId('manual-name').value.trim() || '現在地のゴルフ場',
